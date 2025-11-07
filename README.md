@@ -1,6 +1,6 @@
 # AI-Powered-Threat-Intelligence-Correlation-Engine
 
-# 🛡️ Unified Threat Reporter (SentinelScope)
+# 🛡️ AI-Powered-Threat-Intelligence-Correlation-Engine
 
 ## Project Overview
 
