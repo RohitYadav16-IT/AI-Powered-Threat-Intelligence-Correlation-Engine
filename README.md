@@ -74,31 +74,6 @@ The **AI-Powered Threat Intelligence Correlation Engine** is a Streamlit web app
     ```
 
 ---
-
-## ☁️ Deployment to Streamlit Community Cloud
-
-The application is specifically structured for easy, secure deployment on Streamlit's free platform.
-
-### Crucial Security Step: Secrets Management
-
-**Do not push your API keys to GitHub.** Follow these steps to deploy securely:
-
-1.  **Push Code:** Ensure all your code (`security_analyzer_app.py`, `requirements.txt`) is pushed to your GitHub repository.
-2.  **Go to Streamlit Cloud:** Log in with your GitHub account.
-3.  **New App:** Click **"New app"** and point it to your repository, branch, and the main file (`security_analyzer_app.py`).
-4.  **Add Secrets:** Click **"Advanced settings"** and, in the secrets text area, paste your configuration in TOML format:
-
-    ```toml
-    # Paste this entire block into the Streamlit Secrets text area
-    GEMINI_API_KEY = "YOUR_KEY_HERE"
-    VIRUSTOTAL_API_KEY = "YOUR_KEY_HERE"
-    ABUSEIPDB_API_KEY = "YOUR_KEY_HERE"
-    ```
-    
-5.  **Deploy:** Click Deploy. The app will launch and securely access your keys via `os.environ.get()`.
-
----
-
 ## 🤝 Contribution
 Feel free to fork this project, improve the AI prompts for better interpretation, or add more API integrations (e.g., Shodan, Censys). Pull requests are welcome!
 
