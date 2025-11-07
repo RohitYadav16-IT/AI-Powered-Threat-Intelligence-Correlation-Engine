@@ -60,17 +60,7 @@ The **AI-Powered-Threat-Intelligence-Correlation-Engine** is a Streamlit web app
     ```
     *(If you haven't created it yet, a basic `requirements.txt` should contain: `streamlit`, `requests`, `google-genai`, `pandas`)*
 
-4.  **Set Environment Variables (Local Testing):**
-    For local testing, you must load your API keys into your environment. You can use a `.env` file and a package like `python-dotenv` or set them directly in your terminal session.
-
-    **Windows (PowerShell):**
-    ```powershell
-    $env:GEMINI_API_KEY="YOUR_KEY_HERE"
-    $env:VIRUSTOTAL_API_KEY="YOUR_KEY_HERE"
-    $env:ABUSEIPDB_API_KEY="YOUR_KEY_HERE"
-    ```
-
-5.  **Run the Application:**
+4.  **Run the Application:**
     ```bash
     streamlit run security_analyzer_app.py
     ```
@@ -105,6 +95,4 @@ The application is specifically structured for easy, secure deployment on Stream
 
 Feel free to fork this project, improve the AI prompts for better interpretation, or add more API integrations (e.g., Shodan, Censys). Pull requests are welcome!
 
-### License
 
-(You can add a license here, e.g., MIT License)
