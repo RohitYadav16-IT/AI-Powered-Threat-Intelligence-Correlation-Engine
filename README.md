@@ -56,7 +56,7 @@ The **AI-Powered Threat Intelligence Correlation Engine** is a Streamlit web app
     ```bash
     pip install -r requirements.txt
     ```
-    *(If you haven't created it yet, a basic `requirements.txt` should contain: `streamlit`, `requests`, `google-genai`, `pandas`)*
+    
 
 4.  **Set Environment Variables (Local Testing):**
     For local testing, you must load your API keys into your environment. You can use a `.env` file and a package like `python-dotenv` or set them directly in your terminal session.
