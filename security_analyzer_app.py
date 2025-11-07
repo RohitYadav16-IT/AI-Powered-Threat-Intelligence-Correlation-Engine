@@ -24,6 +24,8 @@ if not all([GEMINI_API_KEY, VIRUSTOTAL_API_KEY, ABUSEIPDB_API_KEY]):
     st.stop()
 
 try:
+    # IMPORTANT: The API key for Gemini is automatically loaded when the Client is initialized, 
+    # but we must pass it explicitly in this context.
     gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 except Exception as e:
     st.error(f"Failed to initialize Gemini Client. Check your API key. Error: {e}")
@@ -91,7 +93,6 @@ def convert_to_csv(data: dict) -> bytes:
     df = pd.json_normalize(data, sep='_')
     return df.to_csv(index=False).encode('utf-8')
 
-# Function to check for report via hash (faster if file is known)
 def check_virustotal_hash(file_hash):
     """Check VirusTotal for an existing file report using its hash."""
     try:
@@ -117,7 +118,12 @@ def check_virustotal_hash(file_hash):
             return summary_data, raw_data, True # Found
         
         # If status is 404 or other non-200, it's not known or not completed
-        return {"error": "Report not found or not complete."}, raw_data, False
+        # Return an error message specific to the hash lookup failure
+        error_msg = f"Report not found for hash: {file_hash}. (HTTP {resp.status_code})"
+        if 'error' in raw_data and 'message' in raw_data['error']:
+            error_msg = f"VT API Error: {raw_data['error']['message']}"
+            
+        return {"error": error_msg}, raw_data, False
         
     except Exception as e:
         return {"error": str(e)}, {"raw_error": str(e)}, False
@@ -222,6 +228,7 @@ def analyze_uploaded_file(file):
         status_placeholder = st.empty()
         status_placeholder.info(f"Checking cache for existing report (Hash: {sha256_hash[:10]}...).")
         
+        # Check hash returns: summary_data, raw_data, found_cached
         summary_data, raw_data, found_cached = check_virustotal_hash(sha256_hash)
         
         if found_cached:
@@ -298,7 +305,7 @@ def display_summary(results, type):
         | Suspicious/Total Reports | {vt.get('suspicious', 'N/A')} engines reported suspicious | {abuse.get('totalReports', 'N/A')} total reports |
         | Country Origin | {vt.get('country', 'N/A')} | {abuse.get('countryCode', 'N/A')} |
         """)
-    elif type in ["URL", "Domain", "File"]:
+    elif type in ["URL", "Domain", "File", "Hash"]:
         vt = results['vt_data']
         st.markdown(f"""
         | Metric | Value |
@@ -310,12 +317,12 @@ def display_summary(results, type):
 
 
 # === Streamlit UI Tabs ===
-tab1, tab2, tab3 = st.tabs(["📁 File Scan", "🌐 URL / Domain Scan", "📡 IP Reputation"])
+# ADDED new tab for Hash Scan
+tab1, tab2, tab3, tab4 = st.tabs(["📁 File Scan", "🌐 URL / Domain Scan", "📡 IP Reputation", "🔢 Hash Scan"])
 
-# --- FILE SCAN ---
+# --- FILE SCAN (UNCHANGED) ---
 with tab1:
     st.subheader("📁 Upload a File for Analysis (VirusTotal)")
-    # Removed the st.info() line about the timeout.
     uploaded_file = st.file_uploader("Choose a file", type=None)
     if uploaded_file and st.button("🚀 Scan File"):
         # The main status container is now used only for the AI step
@@ -353,7 +360,7 @@ with tab1:
                 )
                 
                 
-# --- URL / DOMAIN SCAN ---
+# --- URL / DOMAIN SCAN (UNCHANGED) ---
 with tab2:
     st.subheader("🌐 Analyze URL or Domain (VirusTotal)")
     url_input = st.text_input("Enter a URL or Domain", placeholder="https://example.com or example.com")
@@ -390,7 +397,7 @@ with tab2:
                 )
 
 
-# --- IP REPUTATION ---
+# --- IP REPUTATION (UNCHANGED) ---
 with tab3:
     st.subheader("📡 Check IP Reputation (AbuseIPDB + VirusTotal)")
     ip_input = st.text_input("Enter an IP address", placeholder="8.8.8.8")
@@ -452,3 +459,43 @@ with tab3:
             file_name=f"{ip_input}_combined_scan.csv",
             mime="text/csv",
         )
+        
+# --- HASH SCAN (NEW) ---
+with tab4:
+    st.subheader("🔢 Scan File Hash (SHA256, MD5, SHA1) using VirusTotal")
+    hash_input = st.text_input("Enter file hash (e.g., SHA256)", 
+                               placeholder="e.g., 275a5932599b787968593a1290209427b3d36009a47d2f9d6c48d0c64980a316")
+    
+    if hash_input and st.button("🔎 Search Hash"):
+        with st.status(label=f"Starting Hash Lookup for {hash_input[:10]}...", expanded=True) as status:
+            status.update(label="1/2: Querying VirusTotal for hash report...", state="running")
+            
+            # check_virustotal_hash returns (summary_data, raw_data, found_cached)
+            summary_data, raw_data, found = check_virustotal_hash(hash_input)
+            
+            if "error" in summary_data and not found:
+                status.update(label="❌ Hash Scan Failed!", state="error")
+                st.error(f"Error: {summary_data['error']}. This likely means the hash is unknown to VirusTotal or the input is invalid.")
+            else:
+                status.update(label="2/2: Report found. Invoking AI Interpretation...", state="running")
+                
+                # Summary and Explanation
+                display_summary({'vt_data': summary_data}, "Hash") # Reuse File/URL display logic
+                ai_text = generate_ai_explanation(summary_data, "file hash", status_tracker=status)
+                
+                st.success(f"✅ Hash analysis complete: {summary_data.get('malicious', 'N/A')} malicious detections.")
+                st.markdown("### 🧠 Gemini AI Explanation")
+                st.write(ai_text)
+                
+                st.markdown("---")
+                st.markdown("#### 📜 Raw VirusTotal Data")
+                st.json(raw_data)
+                
+                # Download Button
+                csv_data = convert_to_csv(raw_data)
+                st.download_button(
+                    label="⬇️ Download Raw Data as CSV",
+                    data=csv_data,
+                    file_name=f"{hash_input[:10]}_VT_hash_scan.csv",
+                    mime="text/csv",
+                )
