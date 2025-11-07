@@ -3,7 +3,7 @@ import requests
 import os
 import time
 import pandas as pd
-# FIX: Corrected the import name to match the installed package (google-genai)
+import hashlib
 import google.genai as genai 
 
 # === API KEYS & CONFIGURATION ===
@@ -23,7 +23,6 @@ if not all([GEMINI_API_KEY, VIRUSTOTAL_API_KEY, ABUSEIPDB_API_KEY]):
     """)
     st.stop()
 
-# FIX: Replaced the deprecated genai.configure() with the Client constructor
 try:
     gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 except Exception as e:
@@ -38,9 +37,9 @@ VT_DOMAIN_URL = "https://www.virustotal.com/api/v3/domains/"
 VT_IP_URL = "https://www.virustotal.com/api/v3/ip_addresses/"
 ABUSEIPDB_API_URL = "https://api.abuseipdb.com/api/v2/check"
 
-# Polling parameters for file uploads
-POLL_INTERVAL_SECONDS = 5
-POLL_TIMEOUT_SECONDS = 60
+# Polling parameters for file uploads (Increased for Free API)
+POLL_INTERVAL_SECONDS = 10 
+POLL_TIMEOUT_SECONDS = 300 
 
 # === Streamlit Setup ===
 st.set_page_config(page_title="🛡️ Security Analyzer", page_icon="🧠", layout="centered")
@@ -58,7 +57,6 @@ def generate_ai_explanation(structured_data, analysis_type, status_tracker=None)
         if status_tracker:
             status_tracker.update(label="🧠 **Step 3/3:** Invoking Gemini AI for Interpretation...", state="running")
             
-        # FIX: Using the stable model and calling via the client
         model_name = "gemini-2.5-flash"
         
         prompt = f"""
@@ -93,7 +91,36 @@ def convert_to_csv(data: dict) -> bytes:
     df = pd.json_normalize(data, sep='_')
     return df.to_csv(index=False).encode('utf-8')
 
-# --- API Functions (Modified to return summary, raw_data) ---
+# Function to check for report via hash (faster if file is known)
+def check_virustotal_hash(file_hash):
+    """Check VirusTotal for an existing file report using its hash."""
+    try:
+        headers = {"x-apikey": VIRUSTOTAL_API_KEY}
+        # The endpoint for retrieving a file report by hash is /files/{hash}
+        url = f"{VT_FILE_URL}/{file_hash}" 
+        
+        resp = requests.get(url, headers=headers)
+        raw_data = resp.json()
+        
+        if resp.status_code == 200:
+            # File is already known and scanned
+            data = raw_data["data"]["attributes"]
+            stats = data.get("last_analysis_stats", {})
+            summary_data = {
+                "source": "VirusTotal (Hash Lookup)",
+                "malicious": stats.get("malicious", 0),
+                "suspicious": stats.get("suspicious", 0),
+                "undetected": stats.get("undetected", 0),
+                "harmless": stats.get("harmless", 0),
+                "status": "completed (cached)"
+            }
+            return summary_data, raw_data, True # Found
+        
+        # If status is 404 or other non-200, it's not known or not completed
+        return {"error": "Report not found or not complete."}, raw_data, False
+        
+    except Exception as e:
+        return {"error": str(e)}, {"raw_error": str(e)}, False
 
 def check_abuseipdb(ip):
     """Query AbuseIPDB for IP reputation."""
@@ -187,10 +214,27 @@ def check_virustotal_ip(ip):
 def analyze_uploaded_file(file):
     """Upload file to VirusTotal and poll for final analysis."""
     try:
-        headers = {"x-apikey": VIRUSTOTAL_API_KEY}
-        files = {"file": (file.name, file.getvalue())}
+        file_bytes = file.getvalue()
+        # 0. Calculate Hash
+        sha256_hash = hashlib.sha256(file_bytes).hexdigest()
         
-        # 1. Upload File
+        # 1. Check if file is already known (Fast Check)
+        status_placeholder = st.empty()
+        status_placeholder.info(f"Checking cache for existing report (Hash: {sha256_hash[:10]}...).")
+        
+        summary_data, raw_data, found_cached = check_virustotal_hash(sha256_hash)
+        
+        if found_cached:
+            status_placeholder.success("✅ **Cache Hit!** Report found instantly.")
+            return summary_data, raw_data
+
+        # --- If not found, proceed to slow upload/polling ---
+        
+        status_placeholder.info("Report not found in cache. Uploading file for scan (low priority, might take up to 5 minutes)...")
+        headers = {"x-apikey": VIRUSTOTAL_API_KEY}
+        files = {"file": (file.name, file_bytes)}
+        
+        # 2. Upload File
         upload_resp = requests.post(VT_FILE_URL, headers=headers, files=files)
         upload_raw_data = upload_resp.json()
         
@@ -201,7 +245,7 @@ def analyze_uploaded_file(file):
         analysis_id = upload_resp.json()["data"]["id"]
         result_url = f"https://www.virustotal.com/api/v3/analyses/{analysis_id}"
 
-        # 2. Polling Loop
+        # 3. Polling Loop
         poll_placeholder = st.empty()
         final_raw_data = upload_raw_data
         
@@ -271,10 +315,13 @@ tab1, tab2, tab3 = st.tabs(["📁 File Scan", "🌐 URL / Domain Scan", "📡 IP
 # --- FILE SCAN ---
 with tab1:
     st.subheader("📁 Upload a File for Analysis (VirusTotal)")
-    uploaded_file = st.file_uploader("Choose a file (Free API size limits apply)", type=None)
+    # Removed the st.info() line about the timeout.
+    uploaded_file = st.file_uploader("Choose a file", type=None)
     if uploaded_file and st.button("🚀 Scan File"):
+        # The main status container is now used only for the AI step
         with st.status(label="Starting File Analysis...", expanded=True) as status:
-            status.update(label="1/3: Uploading file and initializing VirusTotal scan...", state="running")
+            # Analyze function now handles hash check/upload/polling internally with its own placeholders
+            status.update(label="1/3: Running VirusTotal check/upload...", state="running") 
             summary_data, raw_data = analyze_uploaded_file(uploaded_file)
             
             if "error" in summary_data:
@@ -288,7 +335,7 @@ with tab1:
                 # Step 3: AI Interpretation (Uses status_tracker)
                 ai_text = generate_ai_explanation(summary_data, "file", status_tracker=status)
                 
-                st.success(f"✅ File analysis complete: {summary_data['malicious']} malicious detections.")
+                st.success(f"✅ File analysis complete: {summary_data.get('malicious', 'N/A')} malicious detections.")
                 st.markdown("### 🧠 Gemini AI Explanation")
                 st.write(ai_text)
                 
