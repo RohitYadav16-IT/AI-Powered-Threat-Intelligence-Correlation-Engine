@@ -1,79 +1,77 @@
-# 🛡️ AI-Powered Threat Intelligence Correlation Engine
+## 🛡️ AI-Powered Threat Intelligence Correlation Engine
 
-## Project Overview
+This project is a proof-of-concept web application built with **Streamlit** that correlates and simplifies threat intelligence data from multiple security platforms. It transforms complex security metrics (from VirusTotal and AbuseIPDB) into simple, actionable advice using **Google Gemini**.
 
-The **AI-Powered Threat Intelligence Correlation Engine** is a Streamlit web application designed to simplify cybersecurity threat analysis. It integrates data from major threat intelligence platforms (VirusTotal and AbuseIPDB) and leverages the Google Gemini API to translate complex, technical security reports into concise, human-readable summaries.
+The primary goal is to provide non-security professionals with instant, easy-to-understand threat assessments for files, URLs, domains, and IP addresses.
 
-### 💡 Key Features
+### ✨ Key Features
 
-* **Multi-Source Scanning:** Analyze uploaded **files**, **URLs/Domains**, and **IP Addresses**.
-* **Dual-API Intelligence (IPs):** Correlates data from **VirusTotal** (file/URL/IP reputation) and **AbuseIPDB** (IP abuse scoring).
-* **AI Interpretation:** Uses the **Gemini 2.5 Flash** model to provide a **Threat Assessment** ([CLEAN], [MEDIUM CONCERN], etc.) and simple, actionable explanations for non-technical users.
-* **Secure:** Configured to read all API keys securely from environment variables.
-* **Data Export:** Allows users to download the raw JSON responses from all APIs as a CSV file for auditing.
+* **Multi-Vector Analysis:** Scan and analyze four key threat vectors:
+    * **File Analysis:** Upload file scanning and reputation lookups.
+    * **Hash Analysis:** Check file hashes (SHA256, MD5, SHA1) against existing databases.
+    * **URL/Domain Scan:** Assess web resource safety using VirusTotal.
+    * **IP Reputation:** Correlate data from **VirusTotal** and **AbuseIPDB** for a comprehensive score.
+* **AI Interpretation:** Uses the **Google Gemini 2.5 Flash** model to generate a real-time, non-technical summary, threat assessment, and actionable advice.
+* **Performance Optimized:** File analysis includes a critical cache-check strategy by looking up the SHA256 hash before uploading the file, significantly improving performance for known files.
+* **Transparent Status Tracking:** Utilizes Streamlit's `st.status` container to communicate multi-stage process progress, managing perceived latency during long-running tasks like file polling and complex, sequential tasks.
 
----
+### 💻 Technology Stack
 
-## 🛠️ Technology Stack
-
-| Component | Technology | Role |
+| Category | Component | Role |
 | :--- | :--- | :--- |
-| **Frontend/App** | Streamlit | Provides the interactive web UI and hosting framework. |
-| **AI Interpreter** | Google Gemini API (`gemini-2.5-flash`) | Explains combined threat data in natural language. |
-| **Threat Intel 1** | VirusTotal Public API | Provides reputation for files, URLs, and IPs. |
-| **Threat Intel 2** | AbuseIPDB API (Free Tier) | Provides specialized abuse confidence score for IPs. |
-| **Data Processing** | Python, `requests`, `pandas` | Handles API communication, JSON parsing, and CSV export. |
+| **Frontend/Framework** | Streamlit | Rapid development and interactive user interface. |
+| **Generative AI** | Google Gemini 2.5 Flash | Interpretation and summarization of raw security data. |
+| **Threat Intelligence** | VirusTotal (VT) | Core reputation data for files, URLs, domains, and IPs. |
+| **Threat Intelligence** | AbuseIPDB (AIPDB) | Supplemental IP abuse confidence scoring. |
 
----
+*(Dependencies listed in `requirements.txt` include `streamlit==1.39.0`, `numpy==1.26.4`, `pandas==2.2.2`, and `scikit-learn==1.5.2`)*
 
-## 🚀 Getting Started
+### 🚀 Getting Started
 
-### Prerequisites
+#### Prerequisites
 
-1.  **Python:** Python 3.9+ installed.
-2.  **GitHub:** A GitHub account (required for Streamlit Community Cloud deployment).
-3.  **API Keys (NEWLY GENERATED):**
-    * **`GEMINI_API_KEY`** (from Google AI Studio)
-    * **`VIRUSTOTAL_API_KEY`** (from VirusTotal)
-    * **`ABUSEIPDB_API_KEY`** (from AbuseIPDB)
+You will need API keys for the following services:
 
-### Local Setup
+1.  **Google Gemini** (for AI explanations)
+2.  **VirusTotal** (for file, URL, and IP reputation)
+3.  **AbuseIPDB** (for IP abuse confidence scoring)
 
-1.  **Clone the Repository:**
+#### Installation and Running
+
+1.  **Clone the repository:**
     ```bash
-    git clone [YOUR_REPO_URL]
-    cd your-github-repo-name
+    git clone [Your-Repo-Link]
+    cd [Your-Repo-Name]
     ```
 
-2.  **Create and Activate Virtual Environment:**
-    ```bash
-    python -m venv env
-    .\env\Scripts\Activate  # On Windows PowerShell
-    # source env/bin/activate # On Linux/macOS
-    ```
-
-3.  **Install Dependencies:**
+2.  **Install dependencies:**
+    The required packages are listed in `requirements.txt`.
     ```bash
     pip install -r requirements.txt
     ```
-    
 
-4.  **Set Environment Variables (Local Testing):**
-    For local testing, you must load your API keys into your environment. You can use a `.env` file and a package like `python-dotenv` or set them directly in your terminal session.
+3.  **Set Environment Variables (Critical Security Step)**
 
-    **Windows (PowerShell):**
-    ```powershell
-    $env:GEMINI_API_KEY="YOUR_KEY_HERE"
-    $env:VIRUSTOTAL_API_KEY="YOUR_KEY_HERE"
-    $env:ABUSEIPDB_API_KEY="YOUR_KEY_HERE"
+    The application code currently contains a **CRITICAL** vulnerability where API keys are hardcoded. **Before running or deploying**, you must set up a secure secrets management system.
+
+    **Recommendation:** Remove all hardcoded API keys and use environment variables (or Streamlit Secrets for deployment) to load the credentials at runtime.
+
+    Create a file named `.env` or set the variables in your terminal:
+    ```bash
+    export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+    export VIRUSTOTAL_API_KEY="YOUR_VIRUSTOTAL_API_KEY"
+    export ABUSEIPDB_API_KEY="YOUR_ABUSEIPDB_API_KEY"
     ```
 
-5.  **Run the Application:**
+4.  **Run the application:**
     ```bash
     streamlit run security_analyzer_app.py
     ```
 
----
-## 🤝 Contribution
-Feel free to fork this project, improve the AI prompts for better interpretation, or add more API integrations (e.g., Shodan, Censys). Pull requests are welcome!
+### 🚨 Security Warning (MUST READ)
 
+The included `security_analyzer_app.py` file is a **proof-of-concept only** and contains a **Severe Vulnerability**:
+
+* **Vulnerability:** All three external API keys are hardcoded as plain strings at the top of the main script.
+* **Risk:** This is a **CRITICAL** risk, as it leads to the public exposure of these keys, allowing unauthorized usage (financial liability) and key revocation by the vendor (service interruption).
+* **Remediation
