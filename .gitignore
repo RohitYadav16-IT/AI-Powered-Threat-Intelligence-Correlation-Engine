@@ -1,0 +1,24 @@
+# Python-specific files
+__pycache__/
+*.pyc
+*.pyd
+*.so
+venv/
+env/                 # <-- Your virtual environment folder! Keep this out.
+.Python
+build/
+dist/
+.mypy_cache/
+.pytest_cache/
+
+# Streamlit-specific files
+.streamlit/secrets.toml  # <-- Keep local secrets out of Git!
+
+# IDE and OS generated files
+.vscode/             # Visual Studio Code settings
+.idea/               # PyCharm/IntelliJ settings
+.DS_Store            # macOS files
+Thumbs.db            # Windows files
+
+# Environment/Secret files
+.env                 # <-- Your local environment file, which holds API keys!
